@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict 
 import mysql.connector
 from mysql.connector import Error
 from typing import Optional, List, Dict, Any
@@ -21,7 +21,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from pydantic import BaseModel
+
 from typing import Optional
 
 import uuid
@@ -90,8 +90,9 @@ class AvisoUpdate(BaseModel):
     usuarioId: Optional[int] = Field(None, alias="usuarioId")
     estado: Optional[str] = None  # Nuevo campo para el estado
 
-    class Config:
-         validate_by_name = True
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
 
 # Estados válidos para los avisos
 ESTADOS_AVISOS = [
@@ -309,9 +310,10 @@ class Proceso(BaseModel):
     fecha_fin: Optional[str] = Field(None, alias="fechaFin")
     estado: Optional[str] = None
 
-    class Config:
-        validate_by_name = True
-        extra = "allow"  # Permitir campos adicionales
+    model_config = ConfigDict(
+        populate_by_name=True,  # equivalente a validate_by_name
+        extra="allow"           # permite campos adicionales
+    )
 
 # Definimos modelos para comentarios e imágenes
 class ProcesoComentario(BaseModel):
@@ -335,8 +337,9 @@ class AvisoBase(BaseModel):
     establecimientoId: int  # Cambiado de establecimiento_id
     usuarioId: int          # Cambiado de usuario_id
 
-    class Config:
+    model_config = ConfigDict(
         orm_mode = True
+    )
 
 class AvisoCreate(BaseModel):
     nombre: str
@@ -346,8 +349,9 @@ class AvisoCreate(BaseModel):
     usuarioId: int = Field(alias="usuarioId")
     procesoId: Optional[int] = Field(None, alias="procesoId")  # Campo añadido para asociar con proceso
 
-    class Config:
+    model_config = ConfigDict(
         validate_by_name = True
+    )
 
 # Modifica la clase Aviso para incluir estado
 class Aviso(AvisoBase):
@@ -355,10 +359,11 @@ class Aviso(AvisoBase):
     fechaCreacion: datetime  # Cambiado de str a datetime
     estado: Optional[str] = "Pendiente"  # Estado por defecto
 
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda dt: dt.strftime('%Y-%m-%d %H:%M:%S')
         }
+    )
 
 # Directorio para almacenar imágenes
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
