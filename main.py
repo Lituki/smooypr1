@@ -91,7 +91,7 @@ class AvisoUpdate(BaseModel):
     estado: Optional[str] = None  # Nuevo campo para el estado
 
     class Config:
-        allow_population_by_field_name = True
+         validate_by_name = True
 
 # Estados válidos para los avisos
 ESTADOS_AVISOS = [
@@ -310,7 +310,7 @@ class Proceso(BaseModel):
     estado: Optional[str] = None
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
         extra = "allow"  # Permitir campos adicionales
 
 # Definimos modelos para comentarios e imágenes
@@ -347,7 +347,7 @@ class AvisoCreate(BaseModel):
     procesoId: Optional[int] = Field(None, alias="procesoId")  # Campo añadido para asociar con proceso
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
 
 # Modifica la clase Aviso para incluir estado
 class Aviso(AvisoBase):
