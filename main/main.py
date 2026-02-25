@@ -11,9 +11,6 @@ from pydantic import BaseModel, Field, ConfigDict
 import mysql.connector
 from mysql.connector import Error
 from typing import Optional, List, Dict, Any
-from datetime import datetime
-from fastapi import Path, Body, Query, HTTPException, Depends
-from typing import List, Optional, Dict, Any
 import os
 import time
 import shutil
@@ -21,9 +18,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-
-from typing import Optional
-
 import uuid
 from passlib.context import CryptContext
 
