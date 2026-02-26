@@ -461,191 +461,72 @@ def verify_password(plain_password, stored_password):
     
     return False
 
+# 2. ENDPOINT DE LOGIN MEJORADO CON VERIFICACIÓN DE TIMESTAMP
 @app.post("/login")
-async def login(login_data: LoginRequest):
-    # Verificación inicial de datos
-    if not login_data.usuario or not login_data.contraseña:
-        return {
-            "success": False,
-            "message": "Usuario y contraseña son requeridos"
-        }
-    
-    print(f"Intento de login para: {login_data.usuario}")
-    
-    # Conectar a la base de datos
-    conexion = conectar_db()
-    if conexion is None:
-        print("Error: No se pudo conectar a la base de datos")
-        return {
-            "success": False,
-            "message": "Error interno del servidor. Intente más tarde."
-        }
-    
-    cursor = None
+async def login(request: LoginRequest):
+    """
+    Endpoint de login mejorado que verifica timestamps de sesión
+    """
     try:
+        conexion = conectar_db()
+        if not conexion:
+            return {"success": False, "message": "Error de conexión"}
+        
         cursor = conexion.cursor(dictionary=True)
         
-        # Buscar usuario en la base de datos
-        cursor.execute("SELECT * FROM usuarios WHERE usuario = %s", (login_data.usuario,))
+        # Buscar usuario
+        cursor.execute("SELECT * FROM usuarios WHERE usuario = %s", (request.usuario,))
         usuario = cursor.fetchone()
         
         if not usuario:
-            print(f"Usuario no encontrado: {login_data.usuario}")
-            return {
-                "success": False,
-                "message": "Usuario o contraseña incorrectos"
-            }
+            return {"success": False, "message": "Usuario no encontrado"}
         
-        print(f"Usuario encontrado: {login_data.usuario}, ID: {usuario['ID']}, Rol: {usuario['Rol']}")
-        
-        # Determine the correct column name for password
+        # Verificar contraseña
         password_column = None
-        for possible_column in ['Contraseña', 'contraseña', 'contrasena', 'password']:
-            if possible_column in usuario:
-                password_column = possible_column
+        for col in ['Contraseña', 'contraseña', 'contrasena', 'password']:
+            if col in usuario:
+                password_column = col
                 break
         
         if not password_column:
-            print("Error: No se pudo encontrar la columna de contraseña")
-            return {
-                "success": False,
-                "message": "Error de configuración del servidor"
-            }
+            return {"success": False, "message": "Error de configuración"}
         
-        # Password verification - with logging for debugging
         stored_password = usuario[password_column]
-        print(f"Contraseña almacenada: {stored_password[:6]}... (primeros caracteres)")
         
-        # ELIMINADO: ya no hay bypass para usuarios de prueba
+        # Verificar contraseña - ELIMINADO el bypass para AdminSMOOY y StaffSMOOY
+        password_valid = False
         
-        # Better error handling for bcrypt verification
-        try:
-            # Check if the stored password looks like a bcrypt hash
-            if stored_password.startswith('$2'):
-                # It's a bcrypt hash, use verify
-                is_password_correct = pwd_context.verify(login_data.contraseña, stored_password)
-            else:
-                # Plain text comparison (fallback, not recommended)
-                is_password_correct = (login_data.contraseña == stored_password)
-            
-            print(f"Verificación de contraseña: {is_password_correct}")
-        except Exception as e:
-            print(f"Error en verificación de contraseña: {str(e)}")
-            is_password_correct = False
-        
-    except Exception as e:
-        print(f"ERROR EN LOGIN: {str(e)}")
-    
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        
-        # Buscar usuario en la base de datos
-        cursor.execute("SELECT * FROM usuarios WHERE usuario = %s", (login_data.usuario,))
-        usuario = cursor.fetchone()
-        
-        if not usuario:
-            print(f"Usuario no encontrado: {login_data.usuario}")
-            return {
-                "success": False,
-                "message": "Usuario o contraseña incorrectos"
-            }
-        
-        print(f"Usuario encontrado: {login_data.usuario}, ID: {usuario['ID']}, Rol: {usuario['Rol']}")
-        
-        # Determine the correct column name for password
-        password_column = None
-        for possible_column in ['Contraseña', 'contraseña', 'contrasena', 'password']:
-            if possible_column in usuario:
-                password_column = possible_column
-                break
-        
-        if not password_column:
-            print("Error: No se pudo encontrar la columna de contraseña")
-            return {
-                "success": False,
-                "message": "Error de configuración del servidor"
-            }
-        
-        # Password verification - with logging for debugging
-        stored_password = usuario[password_column]
-        print(f"Contraseña almacenada: {stored_password[:6]}... (primeros caracteres)")
-        
-        # Special handling for test users
-        if login_data.usuario in ["AdminSMOOY", "StaffSMOOY"] and login_data.contraseña == "SMOOY":
-            is_password_correct = True
-            print(f"Bypass de contraseña para usuario de prueba: {login_data.usuario}")
+        # Verificación estándar para cualquier usuario
+        if stored_password and stored_password.startswith('$2'):
+            password_valid = pwd_context.verify(request.contraseña, stored_password)
         else:
-            # Better error handling for bcrypt verification
-            try:
-                # Check if the stored password looks like a bcrypt hash
-                if stored_password.startswith('$2'):
-                    # It's a bcrypt hash, use verify
-                    is_password_correct = pwd_context.verify(login_data.contraseña, stored_password)
-                else:
-                    # Plain text comparison (fallback, not recommended)
-                    is_password_correct = (login_data.contraseña == stored_password)
-                
-                print(f"Verificación de contraseña: {is_password_correct}")
-            except Exception as e:
-                print(f"Error en verificación de contraseña: {str(e)}")
-                is_password_correct = False
+            password_valid = (request.contraseña == stored_password)
         
-        if not is_password_correct:
-            return {
-                "success": False,
-                "message": "Usuario o contraseña incorrectos"
-            }
+        if not password_valid:
+            print(f"[LOGIN] Contraseña incorrecta para usuario: {request.usuario}")
+            return {"success": False, "message": "Usuario o contraseña incorrectos"}
         
-        # Antes: Dentro de este endpoint había:
-        #   from jose import jwt
-        #   from datetime import datetime, timedelta
-        #   SECRET_KEY = "tu_clave_secreta_aqui"   ← clave diferente a la de arriba!
-        #
-        # Esto significaba que el token generado aquí usaba una clave DISTINTA
-        # a la que usaba el middleware para verificarlo, causando que los tokens
-        # fallaran la validación de forma aleatoria.
-        #
-        # Ahora: Se usa directamente create_access_token() que ya usa la
-        # SECRET_KEY única definida al inicio del archivo.
+        # Generar nuevo token
+        token = create_access_token(usuario["ID"], usuario["usuario"])
         
-        # Generar token usando la función central (que ya usa la SECRET_KEY correcta)
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={
-                "sub": usuario["usuario"],
-                "user_id": usuario["ID"],
-                "role": usuario["Rol"]
-            },
-            expires_delta=access_token_expires
-        )
-
-        # Debug: imprimir los primeros caracteres del token para verificación
-        token_preview = access_token[:15] + "..." if len(access_token) > 15 else access_token
-        print(f"Token generado (preview): {token_preview}")
-        
-        # Login exitoso
         return {
             "success": True,
             "message": "Login exitoso",
-            "rol": usuario["Rol"],
-            "user_id": usuario["ID"],
-            "token": access_token
+            "token": token,
+            "userId": usuario["ID"],
+            "rol": usuario.get("Rol", "")
         }
-    
+        
     except Exception as e:
-        print(f"ERROR EN LOGIN: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {
-            "success": False,
-            "message": "Error en el servidor"
-        }
+        print(f"[LOGIN] Error: {str(e)}")
+        return {"success": False, "message": "Error interno del servidor"}
+    
     finally:
         if cursor:
             cursor.close()
         if conexion and conexion.is_connected():
             conexion.close()
+
 
 # Para proteger rutas específicas, agrega la dependencia get_current_user
 # Ejemplo:
@@ -4942,73 +4823,6 @@ async def cambiar_password(datos: CambiarPasswordRequest):
             cursor.close()
         if conexion and conexion.is_connected():
             conexion.close()
-
-# 2. ENDPOINT DE LOGIN MEJORADO CON VERIFICACIÓN DE TIMESTAMP
-@app.post("/login")
-async def login(request: LoginRequest):
-    """
-    Endpoint de login mejorado que verifica timestamps de sesión
-    """
-    try:
-        conexion = conectar_db()
-        if not conexion:
-            return LoginResponse(success=False, message="Error de conexión")
-        
-        cursor = conexion.cursor(dictionary=True)
-        
-        # Buscar usuario
-        cursor.execute("SELECT * FROM usuarios WHERE usuario = %s", (request.usuario,))
-        usuario = cursor.fetchone()
-        
-        if not usuario:
-            return LoginResponse(success=False, message="Usuario no encontrado")
-        
-        # Verificar contraseña
-        password_column = None
-        for col in ['Contraseña', 'contraseña', 'contrasena', 'password']:
-            if col in usuario:
-                password_column = col
-                break
-        
-        if not password_column:
-            return LoginResponse(success=False, message="Error de configuración")
-        
-        stored_password = usuario[password_column]
-        
-        # Verificar contraseña - ELIMINADO el bypass para AdminSMOOY y StaffSMOOY
-        password_valid = False
-        
-        # Verificación estándar para cualquier usuario
-        if stored_password and stored_password.startswith('$2'):
-            password_valid = pwd_context.verify(request.contraseña, stored_password)
-        else:
-            password_valid = (request.contraseña == stored_password)
-        
-        if not password_valid:
-            print(f"[LOGIN] Contraseña incorrecta para usuario: {request.usuario}")
-            return LoginResponse(success=False, message="Usuario o contraseña incorrectos")
-        
-        # Generar nuevo token
-        token = generate_jwt_token(usuario["ID"], usuario["usuario"])
-        
-        return LoginResponse(
-            success=True,
-            message="Login exitoso",
-            token=token,
-            userId=usuario["ID"],
-            rol=usuario.get("Rol", "")
-        )
-        
-    except Exception as e:
-        print(f"[LOGIN] Error: {str(e)}")
-        return LoginResponse(success=False, message="Error interno del servidor")
-    
-    finally:
-        if cursor:
-            cursor.close()
-        if conexion and conexion.is_connected():
-            conexion.close()
-
 
 # Clase para el envío masivo de avisos
 class AvisoMasivo(BaseModel):
