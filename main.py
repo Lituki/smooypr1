@@ -20,14 +20,11 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import uuid
 from passlib.context import CryptContext
-from config import Settings # Importamos la clase de configuración  
+from config import settings # ← Lee .env y valida la configuración
+
+origins = settings.cors_origins_list # ← Viene de .env → CORS_ORIGINS (convertido a lista en config.py)
 
 app= FastAPI()
-origins = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-    "http://212.227.147.252:5500"
-]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -37,9 +34,9 @@ app.add_middleware(
 )
 
 # Configuración JWT - USAR EXACTAMENTE ESTOS VALORES
-SECRET_KEY = "tu_clave_secreta_aqui"  # IMPORTANTE: Usa EXACTAMENTE esta clave
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 525600
+SECRET_KEY = settings.jwt_secret_key          # ← Viene de .env → JWT_SECRET_KEY
+ALGORITHM = settings.jwt_algorithm            # ← Viene de .env → JWT_ALGORITHM (default: HS256)
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.jwt_expire_minutes  # ← Viene de .env → JWT_EXPIRE_MINUTES
 
 # Configuración de seguridad para contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -99,14 +96,17 @@ ESTADOS_AVISOS = [
 ]
 
 # Conexión a la base de datos
+# Los valores vienen de `settings`, que los lee del archivo .env.
+# El .env NO se sube a Git (está en .gitignore).
+
 def conectar_db():
     try:
         connection = mysql.connector.connect(
-            host="127.0.0.1",
-            database='smooydb',
-            user='root',
-            password='W$x*$r2!QE',
-            port=3306
+            host=settings.db_host,
+            database=settings.db_name,
+            user=settings.db_user,
+            password=settings.db_password,
+            port=settings.db_port
         )
         if connection.is_connected():
             # print("Conexión a MySQL establecida correctamente")
@@ -212,7 +212,13 @@ def inicializar_db():
 # Llamar a la función de inicialización una sola vez
 inicializar_db()
 
-app = FastAPI()
+# Antes: Aquí había "app = FastAPI()" por segunda vez, lo que sobreescribía
+#        la instancia creada al principio junto con todo su middleware CORS.
+#        El resultado era que el CORS configurado arriba nunca se aplicaba.
+#
+# Ahora: Solo existe una instancia de app, creada al principio del archivo.
+#        Esta línea queda como comentario explicativo para dejar rastro
+#        del cambio realizado.
 
 # Ejecutar verificación de tablas al iniciar
 verificar_tablas()
@@ -591,32 +597,19 @@ async def login(login_data: LoginRequest):
                 "message": "Usuario o contraseña incorrectos"
             }
         
-        # Generar token JWT
-        from jose import jwt
-        from datetime import datetime, timedelta
+        # Antes: Dentro de este endpoint había:
+        #   from jose import jwt
+        #   from datetime import datetime, timedelta
+        #   SECRET_KEY = "tu_clave_secreta_aqui"   ← clave diferente a la de arriba!
+        #
+        # Esto significaba que el token generado aquí usaba una clave DISTINTA
+        # a la que usaba el middleware para verificarlo, causando que los tokens
+        # fallaran la validación de forma aleatoria.
+        #
+        # Ahora: Se usa directamente create_access_token() que ya usa la
+        # SECRET_KEY única definida al inicio del archivo.
         
-        SECRET_KEY = "tu_clave_secreta_aqui"
-        ALGORITHM = "HS256"
-        
-        expires = datetime.utcnow() + timedelta(minutes=1440)  # 24 horas
-        to_encode = {
-            "sub": usuario["usuario"],
-            "user_id": usuario["ID"],
-            "role": usuario["Rol"],
-            "exp": expires
-        }
-        
-        try:
-            access_token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-            print(f"Token JWT generado correctamente para {login_data.usuario}")
-        except Exception as e:
-            print(f"Error al generar token: {str(e)}")
-            return {
-                "success": False,
-                "message": "Error al generar credenciales"
-            }
-        
-        # Contraseña correcta, generar token JWT
+        # Generar token usando la función central (que ya usa la SECRET_KEY correcta)
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={
@@ -2244,31 +2237,6 @@ async def debug_login(request: Request):
         "headers": dict(request.headers)
     }
 
-# Endpoint temporal para regenerar la contraseña de AdminSMOOY
-@app.get("/regenerar_contrasena_admin")
-def regenerar_contrasena_admin():
-    """
-    Endpoint temporal para regenerar la contraseña del usuario AdminSMOOY.
-    Este endpoint debe eliminarse después de usarlo una vez.
-    """
-    # Regenerar la contraseña para el usuario AdminSMOOY
-    # Usar la misma configuración que en la aplicación
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-    # Generar un nuevo hash para la contraseña "SMOOY"
-    hashed_password = pwd_context.hash("SMOOY")
-
-    # Actualizar en la base de datos
-    conexion = conectar_db()
-    cursor = conexion.cursor()
-    cursor.execute("UPDATE usuarios SET Contraseña = %s WHERE usuario = %s", 
-                 (hashed_password, "AdminSMOOY"))
-    conexion.commit()
-    cursor.close()
-    conexion.close()
-
-    return {"mensaje": f"Nueva contraseña hash generada para AdminSMOOY: {hashed_password}"}
-
 @app.get("/verify-token")
 async def verify_token_endpoint(request: Request):
     """Endpoint para verificar el token"""
@@ -2442,258 +2410,58 @@ async def admin_reset_password(user_id: int, new_password: str, user: dict = Dep
         if conexion:
             conexion.close()
 
-# Borra TODOS los middleware existentes y usa solo esta implementación
+# (PUBLIC_PATHS y middleware verify_jwt_token adicionales que estaban aquí
+#  eliminados — eran duplicados que causaban que cada request
+#  pasara por múltiples middlewares JWT con lógica contradictoria.)
 
-# Lista definitiva de rutas públicas
-PUBLIC_PATHS = [
-    "/login",
-    "/registro",
-    "/docs", 
-    "/openapi.json",
-    "/redoc",
-    "/static",
-    "/debug/headers",
-    "/verify-token",
-    "/regenerar_contrasena_admin",
-    "/api-status"  # Añadir endpoint de estado
-]
+# (Las redefiniciones de SECRET_KEY, pwd_context, middlewares y login
+#  que estaban aquí han sido eliminadas en el Paso 1. Ver comentario anterior.)
 
-@app.middleware("http")
-async def verify_jwt_token(request: Request, call_next):
-    path = request.url.path
-    
-    # Verificar si es una ruta pública o empieza con un patrón público
-    if path in PUBLIC_PATHS or any(path.startswith(prefix) for prefix in ["/static/", "/docs/", "/openapi.json"]):
-        print(f"Acceso permitido a ruta pública: {path}")
-        return await call_next(request)
-    
-        print(f"Error validando token para {path}: {str(e)}")
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Token inválido o expirado"}
-        )
-    
-    return await call_next(request)
+# ---------------------------------------------------------------------------
+# Código de migrate_passwords.py ELIMINADO
+#
+# Antes: Al final del archivo había un bloque copiado de un script de
+#        migración independiente que redefinía:
+#          - conectar_db() con credenciales hardcodeadas (duplicado)
+#          - pwd_context (duplicado)
+#          - get_password_hash() (duplicado)
+#          - SECRET_KEY = "tu_clave_secreta_compleja_aqui" (tercera versión!)
+#          - verify_password() (duplicado con lógica diferente)
+#          - create_access_token() (duplicado)
+#          - Varios middlewares @app.middleware("http") adicionales
+#
+# Las redefiniciones al final SOBREESCRIBÍAN las definidas al principio.
+# Como Python ejecuta el archivo de arriba a abajo, la última definición
+# de SECRET_KEY ganaba, que era diferente a las anteriores.
+#
+# Ahora: Todo esto está eliminado. Las funciones únicas y correctas
+#        están definidas una sola vez en la zona de configuración
+#        al inicio del archivo.
+# ---------------------------------------------------------------------------
 
-# Importaciones necesarias (verifica que estén al principio del archivo)
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from typing import Optional
+# ---------------------------------------------------------------------------
+# FIN DEL ARCHIVO
+# ---------------------------------------------------------------------------
 
-# Configuración de JWT
-SECRET_KEY = "tu_clave_secreta_compleja_aqui"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 525600  # 24 horas
-
-# Configuración de bcrypt para hashing de contraseñas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Función para verificar contraseñas
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-# Función para generar hash de contraseñas
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-# Función para crear token JWT
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-# Middleware de verificación JWT
-@app.middleware("http")
-async def verify_jwt_token(request: Request, call_next):
-    # Definir rutas públicas que no requieren autenticación
-    public_paths = ["/login", "/registro", "/docs", "/openapi.json", "/redoc", "/static"]
-    
-    # Si es una ruta pública, permitir acceso sin verificar
-    path = request.url.path
-    if path in public_paths or any(path.startswith(prefix) for prefix in ["/static/", "/docs/"]):
-        return await call_next(request)
-    
-    # Para las rutas protegidas, verificar el token JWT
-    auth_header = request.headers.get("Authorization")
-    
-    if not auth_header or not auth_header.startswith("Bearer "):
-        print(f"🔒 Acceso denegado a {path}: No token proporcionado o formato incorrecto")
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "No se proporcionó un token válido"}
-        )
-    
-    token = auth_header.split(" ")[1]
-    
-    try:
-        # Decodificar y verificar el token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        
-        # Guardar información del usuario en el estado de la solicitud
-        request.state.user = {
-            "username": payload.get("sub"),
-            "user_id": payload.get("user_id"),
-            "role": payload.get("role")
-        }
-        
-        # print(f"✅ Token válido para {payload.get('sub')} accediendo a {path}")
-    except JWTError as e:
-        print(f"❌ Token inválido: {str(e)}")
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Token inválido o expirado"}
-        )
-    
-    # Continuar con la solicitud
-    return await call_next(request)
-
-# Endpoint para login (versión corregida)
-@app.post("/login")
-def login(login_request: LoginRequest):
-    conexion = conectar_db()
-    if conexion is None:
-        raise HTTPException(status_code=500, detail="No se pudo conectar a la base de datos")
-    
-    cursor = None
-    try:
-        cursor = conexion.cursor(dictionary=True)
-        
-        # Buscar usuario en la base de datos
-        cursor.execute("SELECT * FROM usuarios WHERE usuario = %s", (login_request.usuario,))
-        usuario = cursor.fetchone()
-        
-        if not usuario:
-            print(f"❌ Usuario no encontrado: {login_request.usuario}")
-            return {
-                "success": False,
-                "message": "Usuario o contraseña incorrectos"
-            }
-        
-        # Verificar contraseña
-        is_password_correct = verify_password(login_request.contraseña, usuario["Contraseña"])
-        print(f"Verificación de contraseña para {login_request.usuario}: {is_password_correct}")
-        
-        if not is_password_correct:
-            return {
-                "success": False,
-                "message": "Usuario o contraseña incorrectos"
-            }
-        
-        # Generar token JWT
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={
-                "sub": usuario["usuario"],
-                "user_id": usuario["ID"],
-                "role": usuario["Rol"]
-            },
-            expires_delta=access_token_expires
-        )
-        
-        print(f"✅ Login exitoso para {usuario['usuario']}, token JWT generado")
-        
-        # Debug: imprimir los primeros caracteres del token para verificación
-        token_preview = access_token[:15] + "..." if len(access_token) > 15 else access_token
-        print(f"Token generado (preview): {token_preview}")
-        
-        return {
-            "success": True,
-            "message": "Login exitoso",
-            "rol": usuario["Rol"],
-            "user_id": usuario["ID"],
-            "token": access_token
-        }
-    except Exception as e:
-        print(f"❌ Error en login: {str(e)}")
-        return {
-            "success": False,
-            "message": "Error al procesar la solicitud"
-        }
-    finally:
-        if cursor:
-            cursor.close()
-        if conexion and conexion.is_connected():
-            conexion.close()
-
-# Endpoint para regenerar contraseñas con hash bcrypt
-@app.post("/admin/reset-password")
-async def admin_reset_password(username: str, new_password: str, request: Request):
-    # Verificar que el usuario actual es administrador
-    if request.state.user.get("role") != "Administrador":
-        raise HTTPException(status_code=403, detail="No tiene permisos para esta operación")
-        
-    conexion = conectar_db()
-    if conexion is None:
-        raise HTTPException(status_code=500, detail="No se pudo conectar a la base de datos")
-    
-    cursor = None
-    try:
-        cursor = conexion.cursor()
-        
-        # Generar hash de la contraseña
-        hashed_password = get_password_hash(new_password)
-        
-        # Actualizar contraseña en la base de datos
-        cursor.execute("UPDATE usuarios SET Contraseña = %s WHERE usuario = %s", 
-                     (hashed_password, username))
-        
-        conexion.commit()
-        
-        if cursor.rowcount == 0:
-            return {"success": False, "message": "Usuario no encontrado"}
-            
-        return {"success": True, "message": f"Contraseña actualizada para {username}"}
-    finally:
-        if cursor:
-            cursor.close()
-        if conexion and conexion.is_connected():
-            conexion.close()
-
-# migrate_passwords.py
-from passlib.context import CryptContext
-import mysql.connector
-from mysql.connector import Error
-
-# Configuración de bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Función para generar hash de contraseñas
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def conectar_db():
-    try:
-        connection = mysql.connector.connect(
-            host="127.0.0.1",
-            database='smooydb',
-            user='root',
-            password='W$x*$r2!QE',
-            port=3306
-        )
-        if connection.is_connected():
-            # print("Conexión a MySQL establecida correctamente")
-            return connection
-    except Error as e:
-        print(f"Error al conectarse a MySQL: {e}")
-        return None
-
-@app.post("/admin/encriptar_contrasenas")
-def encriptar_contrasenas_admin(password: str = Body(...)):
-    """Endpoint administrativo para encriptar todas las contraseñas"""
-    if password != "clave_admin_secreta":
-        raise HTTPException(status_code=403, detail="No autorizado")
-        
-    conexion = conectar_db()
-    if conexion is None:
-        raise HTTPException(status_code=500, detail="Error de conexión")
-    
-    # Resto del código de encriptación...
+# ---------------------------------------------------------------------------
+# (continuación): Redefiniciones finales eliminadas
+#
+# El bloque que había aquí redefinía:
+#   - SECRET_KEY = "tu_clave_secreta_compleja_aqui"   ← diferente a la del inicio
+#   - ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+#   - pwd_context (tercera instancia)
+#   - verify_password() con lógica diferente a la del inicio
+#   - get_password_hash()
+#   - create_access_token() (segunda copia)
+#   - @app.middleware("http") verify_jwt_token  ← tercer middleware JWT registrado
+#   - @app.middleware("http") verify_jwt_token  ← cuarto middleware JWT registrado
+#   - Un segundo endpoint @app.post("/login") duplicado (que FastAPI ignora)
+#   - Un segundo endpoint @app.post("/admin/reset-password") duplicado
+#
+# Todo esto causaba comportamiento impredecible. Queda eliminado.
+# Las versiones correctas de cada función están definidas una sola vez
+# en la zona de configuración al inicio del archivo.
+# ---------------------------------------------------------------------------
 
 # Endpoints para imágenes de avisos
 @app.get("/avisos/{aviso_id}/imagenes")
