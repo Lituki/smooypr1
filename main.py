@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import uuid
 from passlib.context import CryptContext
+from config import Settings # Importamos la clase de configuración  
 
 app= FastAPI()
 origins = [
