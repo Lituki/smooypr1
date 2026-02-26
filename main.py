@@ -527,21 +527,6 @@ async def login(request: LoginRequest):
         if conexion and conexion.is_connected():
             conexion.close()
 
-
-# Para proteger rutas específicas, agrega la dependencia get_current_user
-# Ejemplo:
-@app.get("/procesos/protegido")
-def obtener_procesos_protegido(
-    establecimiento_id: int = None,
-    current_user: TokenData = Depends(get_current_user)
-):
-    # Verificar permisos basados en el rol si es necesario
-    if current_user.role not in ["Admin", "Staff", "Area Manager"]:
-        raise HTTPException(status_code=403, detail="No tiene permisos para acceder a este recurso")
-    
-    # Implementa la lógica del endpoint
-    return obtener_procesos(establecimiento_id)
-
 # Para proteger rutas específicas, agrega la dependencia get_current_user
 # Ejemplo:
 @app.get("/procesos/protegido")
