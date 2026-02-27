@@ -2193,42 +2193,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
 
-# Middleware para verificar JWT en rutas protegidas
-@app.middleware("http")
-async def jwt_middleware(request: Request, call_next):
-    path = request.url.path
-    
-    # Si es una ruta pública, permitir acceso sin verificar token
-    if path in PUBLIC_PATHS or path.startswith("/static/"):
-        return await call_next(request)
-        
-    # Para las rutas protegidas, verificar el token
-    auth_header = request.headers.get("Authorization")
-    
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "No se proporcionó un token válido"}
-        )
-    
-    token = auth_header.split(" ")[1]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # Almacenar información del usuario en el request para uso posterior
-        request.state.user = {
-            "username": payload.get("sub"),
-            "user_id": payload.get("user_id"),
-            "role": payload.get("role")
-        }
-    except JWTError as e:
-        return JSONResponse(
-            status_code=401,
-            content={"detail": f"Token inválido o expirado: {str(e)}"}
-        )
-    
-    # Continuar con la solicitud
-    return await call_next(request)
-
 # Configuración bcrypt correcta
 from passlib.context import CryptContext
 
