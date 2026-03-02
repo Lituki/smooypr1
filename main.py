@@ -439,22 +439,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 def verificar_contraseña(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-# Reemplaza el endpoint de login con esta versión mejorada
-
-import hashlib  # Or whatever hashing library you're using
-
-def verify_password(plain_password, stored_password):
-    """Verify the password correctly based on your storage method."""
-    # If using plain text (not recommended)
-    if plain_password == stored_password:
-        return True
-    
-    # If using hashed passwords (adjust according to your actual hashing method)
-    # hashed_input = hashlib.sha256(plain_password.encode()).hexdigest()
-    # return hashed_input == stored_password
-    
-    return False
-
 # 2. ENDPOINT DE LOGIN MEJORADO CON VERIFICACIÓN DE TIMESTAMP
 @app.post("/login")
 async def login(request: LoginRequest):
