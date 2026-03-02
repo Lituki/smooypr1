@@ -2352,11 +2352,9 @@ async def subir_imagen_aviso(
     """
     Sube una imagen asociada a un aviso
     """
-    conexion = conectar_db()
-    if conexion is None:
-        raise HTTPException(status_code=500, detail="No se pudo conectar a la base de datos")
+    conexion = None
+    cursor = None    
     
-    cursor = None
     try:
         # Guardar la imagen en el servidor
         contenido = await imagen.read()
@@ -2369,8 +2367,15 @@ async def subir_imagen_aviso(
         
         with open(ruta_completa, "wb") as f:
             f.write(contenido)
-        
-        # Registrar en la base de datos
+
+        # Conectar a la base de datos DESPUÉS de guardar el archivo.
+        # Si la conexión falla, al menos el archivo ya está guardado
+        # y podemos devolver un error claro.
+        conexion = conectar_db()
+        if conexion is None:
+            raise HTTPException(status_code=500, detail="No se pudo conectar a la base de datos")
+    
+        # Registrar la imagen en la base de datos
         cursor = conexion.cursor()
         query = """
         INSERT INTO aviso_imagenes (aviso_id, usuario_id, ruta_imagen, nombre_imagen, fecha_subida)
@@ -2390,7 +2395,37 @@ async def subir_imagen_aviso(
             "fecha_subida": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
     
+    except HTTPException:
+        # Re-lanzar las HTTPException sin modificarlas.
+        # Si no hacemos esto, el except general de abajo las capturaría
+        # y devolvería un error 500 genérico en lugar del error correcto.
+        raise
+
     except Error as e:
+        # Error específico de base de datos.
+        # Antes este bloque no tenía return ni finally,
+        # dejando la conexión abierta para siempre.
+        print(f"Error de base de datos al guardar imagen de aviso: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al insertar en la base de datos: {str(e)}"
+        )
+    except Exception as e:
+        # Cualquier otro error inesperado (error al escribir
+        # el archivo, permisos, disco lleno, etc.)
+        print(f"Error inesperado al subir imagen de aviso: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al subir la imagen: {str(e)}"
+        )
+    
+    finally:
+        # El bloque finally se ejecuta SIEMPRE, tanto si hubo
+        # error como si todo fue bien. Es el único lugar donde debemos
+        # cerrar la conexión para garantizar que nunca quede abierta.
+        # Comprobamos None antes de cerrar porque si conectar_db() falló,
+        # estas variables siguen siendo None y llamar a .close() sobre
+        # None lanzaría otro error.
         if cursor:
             cursor.close()
         if conexion and conexion.is_connected():
