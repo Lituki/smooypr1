@@ -41,6 +41,51 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.jwt_expire_minutes  # ← Viene de .env �
 # Configuración de seguridad para contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12) # bcrypt con 12 rounds para mayor seguridad (ajustable según rendimiento)
 
+# Configuración de OAuth2
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", auto_error=False)
+
+# Función para verificar y decodificar el token JWT
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Credenciales inválidas",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if not token:
+        raise credentials_exception
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        user_id = payload.get("user_id")
+        role = payload.get("role")
+        
+        if username is None or user_id is None:
+            raise credentials_exception
+        
+        return {"username": username, "user_id": user_id, "role": role}
+    except JWTError:
+        raise credentials_exception
+
+def verify_token(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="No se pudieron validar las credenciales",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+        return token_data
+    except JWTError:
+        raise credentials_exception
+
+# Modificar el endpoint de login existente para incluir JWT
+def verificar_contraseña(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
 # Modelos para tokens JWT
 class Token(BaseModel):
     access_token: str
@@ -383,21 +428,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def verify_token(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="No se pudieron validar las credenciales",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-        return token_data
-    except JWTError:
-        raise credentials_exception
+
 
 # Endpoint para obtener token (puedes usarlo para pruebas o como alternativa)
 @app.post("/token", response_model=Token)
@@ -435,9 +466,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         if conexion and conexion.is_connected():
             conexion.close()
 
-# Modificar el endpoint de login existente para incluir JWT
-def verificar_contraseña(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
 
 # 2. ENDPOINT DE LOGIN MEJORADO CON VERIFICACIÓN DE TIMESTAMP
 @app.post("/login")
@@ -2146,9 +2174,6 @@ async def verify_token_endpoint(request: Request):
     except JWTError as e:
         return {"valid": False, "error": str(e)}
 
-# Configuración de OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", auto_error=False)
-
 # Lista de rutas públicas que no requieren autenticación
 PUBLIC_PATHS = [
     "/login",
@@ -2157,28 +2182,6 @@ PUBLIC_PATHS = [
     "/verify-token",
     "/regenerar_contrasena_admin"  # Eliminar en producción
 ]
-
-# Función para verificar y decodificar el token JWT
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Credenciales inválidas",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    if not token:
-        raise credentials_exception
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        user_id = payload.get("user_id")
-        role = payload.get("role")
-        
-        if username is None or user_id is None:
-            raise credentials_exception
-        
-        return {"username": username, "user_id": user_id, "role": role}
-    except JWTError:
-        raise credentials_exception
 
 # Función auxiliar para crear passwords encriptadas
 def get_password_hash(password):
