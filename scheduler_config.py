@@ -101,7 +101,7 @@ def setup_scheduler(app, conectar_db):
                             "horario": horarios[tipo],
                             "fecha_inicio": fecha_actual,
                             "fecha_fin": fecha_actual,
-                            "estado": "Verificación pendiente",
+                            "estado": "Pendiente",
                             "ubicacion": establecimiento["nombre"],
                             "establecimiento_id": establecimiento["id"],
                             "usuario_id": None  # Sistema automático
@@ -189,7 +189,7 @@ def setup_scheduler(app, conectar_db):
                         "horario": hora_actual,
                         "fecha_inicio": fecha_actual,
                         "fecha_fin": fecha_fin,
-                        "estado": "Verificación pendiente",
+                        "estado": "Pendiente",
                         "ubicacion": establecimiento["nombre"],
                         "establecimiento_id": establecimiento["id"],
                         "usuario_id": None
@@ -278,7 +278,7 @@ def setup_scheduler(app, conectar_db):
                         "horario": hora_actual,
                         "fecha_inicio": fecha_actual,
                         "fecha_fin": fecha_fin,
-                        "estado": "Verificación pendiente",
+                        "estado": "Pendiente",
                         "ubicacion": establecimiento["nombre"],
                         "establecimiento_id": establecimiento["id"],
                         "usuario_id": None

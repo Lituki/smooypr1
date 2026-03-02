@@ -17,8 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger('manual_processes')
 
-# Import the necessary modules
-from main import conectar_db
+
 
 def run_manual_job(job_type):
     """Run a specific job manually"""
