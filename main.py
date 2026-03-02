@@ -39,10 +39,7 @@ ALGORITHM = settings.jwt_algorithm            # ← Viene de .env → JWT_ALGORI
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.jwt_expire_minutes  # ← Viene de .env → JWT_EXPIRE_MINUTES
 
 # Configuración de seguridad para contraseñas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Configuración bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12) # bcrypt con 12 rounds para mayor seguridad (ajustable según rendimiento)
 
 # Esquema OAuth2 para autenticación con token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -2205,11 +2202,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         return {"username": username, "user_id": user_id, "role": role}
     except JWTError:
         raise credentials_exception
-
-# Configuración bcrypt correcta
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Función auxiliar para crear passwords encriptadas
 def get_password_hash(password):
