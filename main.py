@@ -220,9 +220,6 @@ inicializar_db()
 #        Esta línea queda como comentario explicativo para dejar rastro
 #        del cambio realizado.
 
-# Ejecutar verificación de tablas al iniciar
-verificar_tablas()
-
 # Primero, definimos correctamente las rutas públicas
 PUBLIC_PATHS = [
     "/login", 
