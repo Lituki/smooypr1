@@ -240,19 +240,26 @@ PUBLIC_PATHS = [
     "/establecimientos" # Ruta de establecimientos
 ]
 
-# 4. ELIMINA TODOS los demás middlewares verify_jwt_token y usa solo este
+#   ELIMINADOS los demás middlewares verify_jwt_token y se usa solo este
+#   para proteger todas las rutas excepto las públicas definidas en PUBLIC_PATHS.
+#   Esto garantiza que el CORS se aplique correctamente a todas las rutas,
+#   y que la verificación de JWT se realice de forma centralizada y consistente.
+#   Además, este middleware se ejecutará antes de cualquier endpoint, lo que garantiza
+#   que las rutas públicas sean accesibles sin token, y las rutas protegidas requieran validación.
 @app.middleware("http")
 async def verify_jwt_token(request: Request, call_next):
     # Lista completa de rutas públicas
     public_paths = [
-        "/login", 
+        "/login",
+        "/registro",
         "/docs",
         "/openapi.json",
         "/redoc",
-        "/static",
-        "/debug/headers",
         "/verify-token",
-        "/api-status"
+        "/debug/headers",
+        "/api-status",
+        "/token",
+        "/regenerar_contrasena_admin",
     ]
     
     path = request.url.path
@@ -467,6 +474,8 @@ async def login(request: LoginRequest):
     """
     Endpoint de login mejorado que verifica timestamps de sesión
     """
+    conexion = None  # ← inicializar aquí
+    cursor = None    # ← inicializar aquí
     try:
         conexion = conectar_db()
         if not conexion:
@@ -507,7 +516,13 @@ async def login(request: LoginRequest):
             return {"success": False, "message": "Usuario o contraseña incorrectos"}
         
         # Generar nuevo token
-        token = create_access_token(usuario["ID"], usuario["usuario"])
+        token = create_access_token(
+            data={
+                "sub": usuario["usuario"],   # nombre de usuario, estándar JWT
+                "user_id": usuario["ID"],    # ID numérico
+                "role": usuario.get("Rol")   # rol, para los permisos
+            }
+        )       
         
         return {
             "success": True,
@@ -1955,12 +1970,13 @@ def crear_usuario(usuario: UsuarioCreate, current_user: TokenData = Depends(get_
             INSERT INTO usuarios (Nombre, apellido, usuario, contraseña, Rol)
             VALUES (%s, %s, %s, %s, %s)
         """
-        
+        hashed_password = pwd_context.hash(usuario.contraseña)
+
         valores = (
             usuario.nombre,
             usuario.apellido,
             usuario.usuario,
-            usuario.contraseña,
+            hashed_password, #Antes usuario.contraseña, ahora la contraseña hasheada 
             usuario.rol
         )
         
