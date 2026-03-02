@@ -41,9 +41,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.jwt_expire_minutes  # ← Viene de .env �
 # Configuración de seguridad para contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12) # bcrypt con 12 rounds para mayor seguridad (ajustable según rendimiento)
 
-# Esquema OAuth2 para autenticación con token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 # Modelos para tokens JWT
 class Token(BaseModel):
     access_token: str
@@ -401,10 +398,6 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         return token_data
     except JWTError:
         raise credentials_exception
-
-# Middleware para verificar token en las solicitudes
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    return verify_token(token)
 
 # Endpoint para obtener token (puedes usarlo para pruebas o como alternativa)
 @app.post("/token", response_model=Token)
