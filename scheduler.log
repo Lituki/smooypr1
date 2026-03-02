@@ -22,3 +22,30 @@
 2026-03-02 11:55:11,302 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
 2026-03-02 11:55:11,303 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
 2026-03-02 11:55:11,303 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:06:34,370 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:06:34,371 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:06:34,372 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:06:34,372 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:08:11,595 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:08:11,596 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:08:11,596 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:08:11,597 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:08:11,613 - scheduler - INFO - Iniciando scheduler para generación automática de procesos...
+2026-03-02 12:08:13,634 - scheduler - ERROR - No se puede conectar a la base de datos. El scheduler podría no funcionar correctamente.
+2026-03-02 12:08:13,640 - apscheduler.scheduler - INFO - Added job "Test Job (Runs every minute)" to job store "default"
+2026-03-02 12:08:13,640 - apscheduler.scheduler - INFO - Added job "Generación de procesos diarios" to job store "default"
+2026-03-02 12:08:13,641 - apscheduler.scheduler - INFO - Added job "Generación de procesos semanales" to job store "default"
+2026-03-02 12:08:13,642 - apscheduler.scheduler - INFO - Added job "Generación de procesos mensuales" to job store "default"
+2026-03-02 12:08:13,642 - apscheduler.scheduler - INFO - Scheduler started
+2026-03-02 12:08:13,643 - scheduler - INFO - Scheduler iniciado correctamente. Próximas ejecuciones:
+2026-03-02 12:08:13,643 - scheduler - INFO - - Test Job (Runs every minute): próxima ejecución 2026-03-02 12:09:11.595213+01:00
+2026-03-02 12:08:13,644 - scheduler - INFO - - Generación de procesos diarios: próxima ejecución 2026-03-02 13:12:00+01:00
+2026-03-02 12:08:13,644 - scheduler - INFO - - Generación de procesos semanales: próxima ejecución 2026-03-09 07:00:00+01:00
+2026-03-02 12:08:13,645 - scheduler - INFO - - Generación de procesos mensuales: próxima ejecución 2026-04-01 07:00:00+02:00
+2026-03-02 12:09:11,646 - apscheduler.executors.default - INFO - Running job "Test Job (Runs every minute) (trigger: interval[0:01:00], next run at: 2026-03-02 12:09:11 CET)" (scheduled at 2026-03-02 12:09:11.595213+01:00)
+2026-03-02 12:09:11,647 - scheduler - INFO - ==== TEST JOB RUNNING ==== Scheduler is working correctly!
+2026-03-02 12:09:11,647 - apscheduler.executors.default - INFO - Job "Test Job (Runs every minute) (trigger: interval[0:01:00], next run at: 2026-03-02 12:10:11 CET)" executed successfully
+2026-03-02 12:20:42,144 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:20:42,145 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:20:42,146 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-03-02 12:20:42,146 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
